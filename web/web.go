@@ -63,7 +63,6 @@ func (h *handler) handleUniqueIdLookup(w http.ResponseWriter, r *http.Request) {
 	fields := map[string]any{
 		"uid": uniqueId,
 		"arn": arn,
-		"ip":  r.Header.Get("X-Forwarded-For"),
 		"cc":  r.Header.Get("Cloudfront-Viewer-Country"),
 		"ua":  r.UserAgent(),
 	}
