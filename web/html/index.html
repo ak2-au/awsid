@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>awsid</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            text-align: center;
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .intro {
+            font-size: 1.2rem;
+            color: #333;
+            max-width: 600px;  /* Set the maximum width for readability */
+            margin: 8px auto;    /* Center the intro text */
+        }
+
+        .input-group {
+            margin: 1rem;
+        }
+
+        .input-group input {
+            padding: 0.5rem;
+            font-size: 1rem;
+            width: 80%;
+            max-width: 400px;            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .input-group button {
+            padding: 0.5rem 1rem;
+            font-size: 1rem;
+            border: none;
+            border-radius: 4px;
+            background-color: #007BFF;
+            color: white;
+            cursor: pointer;
+        }
+
+        .input-group button:hover {
+            background-color: #0056b3;
+        }
+
+        .results {
+            margin-top: 1rem;
+            font-size: 1rem;
+            color: #555;
+        }
+
+        .footer {
+            bottom: 0px;
+            padding: 1rem;
+            width: 100%;
+            text-align: center;
+            color: #646464;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="intro">
+        Provide an AWS unique ID (e.g. beginning with AIDA… or AROA…) and hit "Go". The
+        principal ARN will be looked up using
+        <a href="https://awsteele.com/blog/2023/11/19/reversing-aws-iam-unique-ids.html">this process</a>.
+        Need a sample ID? Try <code>AROAXWYRR55VD5K5I7HZX</code>.
+    </div>
+    <div class="intro">
+        You can also run this from the terminal: <code>curl&nbsp;awsid.dev.ak2.au/id/AROAXWYRR55VD5K5I7HZX</code>
+    </div>
+    <div class="input-group">
+        <input type="text" id="queryInput" placeholder="Enter a unique ID…">
+        <button onclick="fetchResults()">Go</button>
+    </div>
+    <div id="results" class="results"></div>
+</div>
+<div class="footer">
+    Hacked together by <a href="https://www.linkedin.com/in/aidansteele/">Aidan Steele</a>
+</div>
+
+<script>
+    async function fetchResults() {
+        const query = document.getElementById('queryInput').value;
+        const resultsDiv = document.getElementById('results');
+
+        // Clear previous results
+        resultsDiv.innerHTML = 'Loading...';
+
+        try {
+            const response = await fetch(`/id/${query}`, {
+                headers: {
+                    Accept: "application/json"
+                }
+            });
+
+            const data = await response.json();
+            resultsDiv.innerHTML = '';
+            const div = document.createElement('div');
+            div.textContent = data.Principal;
+            resultsDiv.appendChild(div);
+        } catch (error) {
+            resultsDiv.textContent = 'No such principal found';
+        }
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,126 @@
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  CertificateArn:
+    Type: String
+    Default: arn:aws:acm:us-east-1:529928417130:certificate/165a99df-aa3e-4b3e-957c-07ddfc278815
+  HostedZoneId:
+    Type: String
+    Default: Z03358402VF6TD6NTHNS6
+  Domain:
+    Type: String
+    Default: awsid.dev.ak2.au
+
+Mappings:
+  RegionMap:
+    us-east-1:
+      LambdaInsightsLayerArn: arn:aws:lambda:us-east-1:580247275435:layer:LambdaInsightsExtension-Arm64:19
+    us-west-2:
+      LambdaInsightsLayerArn: arn:aws:lambda:us-west-2:580247275435:layer:LambdaInsightsExtension-Arm64:19
+    us-east-2:
+      LambdaInsightsLayerArn: arn:aws:lambda:us-east-2:580247275435:layer:LambdaInsightsExtension-Arm64:21
+    ap-southeast-2:
+      LambdaInsightsLayerArn: arn:aws:lambda:ap-southeast-2:580247275435:layer:LambdaInsightsExtension-Arm64:20
+
+Resources:
+  Bucket:
+    Type: AWS::S3::Bucket
+
+  WebFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: ./web
+      Timeout: 20
+      AutoPublishAliasAllProperties: true
+      PropagateTags: true
+      Handler: bootstrap
+      MemorySize: 512
+      Environment:
+        Variables:
+          ACCOUNT_ID: !Ref AWS::AccountId
+          BUCKET: !Ref Bucket
+      Layers:
+        - !FindInMap [ RegionMap, !Ref AWS::Region, LambdaInsightsLayerArn ]
+      Tags:
+        stack-id: !Ref AWS::StackId
+      Tracing: Active
+      AutoPublishAlias: live
+      Architectures: [arm64]
+      Runtime: provided.al2023
+      FunctionUrlConfig:
+        AuthType: AWS_IAM
+        InvokeMode: RESPONSE_STREAM
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:CreateAccessPoint
+                - s3:DeleteAccessPoint
+                - s3:GetAccessPointPolicy
+                - s3:PutAccessPointPolicy
+              Resource: !Sub arn:aws:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/awsid-*
+
+  Permission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunctionUrl
+      FunctionName: !Ref WebFunction.Alias
+      FunctionUrlAuthType: AWS_IAM
+      Principal: cloudfront.amazonaws.com
+      SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFront}
+
+  OAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Ref AWS::StackName
+        OriginAccessControlOriginType: lambda
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  CloudFront:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        HttpVersion: http2and3
+        Aliases:
+          - !Ref Domain
+        ViewerCertificate:
+          AcmCertificateArn: !Ref CertificateArn
+          MinimumProtocolVersion: TLSv1.2_2021
+          SslSupportMethod: sni-only
+        DefaultCacheBehavior:
+          ViewerProtocolPolicy: allow-all # curl defaults to http, this avoids the need for an -L flag
+          Compress: true
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad # Managed-CachingDisabled
+          OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac # Managed-AllViewerExceptHostHeader
+          TargetOriginId: web
+        Origins:
+          - Id: web
+            DomainName: !Select [2, !Split ["/", !GetAtt WebFunctionUrl.FunctionUrl]]
+            OriginAccessControlId: !Ref OAC
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols: [TLSv1.2]
+            OriginShield:
+              Enabled: true
+              OriginShieldRegion: !Ref AWS::Region
+
+  Record:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref Domain
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt CloudFront.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2 # this is documented as the cloudfront hosted zone id
+
+Outputs:
+  FunctionUrl:
+    Value: !GetAtt WebFunctionUrl.FunctionUrl
+  Distribution:
+    Value: !GetAtt CloudFront.DomainName
