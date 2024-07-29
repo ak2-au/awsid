@@ -10,6 +10,8 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"regexp"
+	"strings"
 
 	"github.com/aws/aws-lambda-go/lambdaurl"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -17,7 +19,13 @@ import (
 	"github.com/aws/smithy-go"
 )
 
-var ErrNoSuchPrincipal = errors.New("no such principal")
+var (
+	ErrNoSuchPrincipal = errors.New("no such principal")
+	ErrInvalidIDFormat = errors.New("invalid AWS ID format")
+)
+
+// Regular expression for valid AWS IDs
+var validIDPattern = regexp.MustCompile(`^[A-Za-z0-9:/]+$`)
 
 //go:embed html
 var htmlFs embed.FS
@@ -57,7 +65,15 @@ type handler struct {
 func (h *handler) handleUniqueIdLookup(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	uniqueId := r.PathValue("id")
+	// Get the id from the URL path instead of query string
+	uniqueId := strings.TrimPrefix(r.URL.Path, "/id/")
+	if err := validateAWSID(uniqueId); err != nil {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintln(w, "invalid AWS ID format")
+		return
+	}
+
 	arn, err := h.uniqueIdToArn(ctx, uniqueId)
 
 	fields := map[string]any{
@@ -122,7 +138,7 @@ func (h *handler) uniqueIdToArn(ctx context.Context, id string) (string, error) 
 				"Principal": {
 					"AWS": "%s"
 				},
-				"Action": "*",
+				"Action": "s3:GetObjectTagging",
 				"Resource": "%s"
 			}
 		]
@@ -157,6 +173,14 @@ func (h *handler) uniqueIdToArn(ctx context.Context, id string) (string, error) 
 	}
 
 	return pj.Statement[0].Principal.AWS, nil
+}
+
+// validateAWSID validates the given AWS ID against the allowed pattern
+func validateAWSID(id string) error {
+	if validIDPattern.MatchString(id) {
+		return nil
+	}
+	return ErrInvalidIDFormat
 }
 
 type policyJson struct {

@@ -113,7 +113,7 @@
     <div id="results" class="results"></div>
 </div>
 <div class="footer">
-    <a href="https://github.com/ak2-au/awsid">Hacked together</a> by <a href="https://www.linkedin.com/in/aidansteele/">Aidan Steele</a>.
+    <a href="https://github.com/ak2-au/awsid">Hacked together</a> by <a href="https://www.linkedin.com/in/aidansteele/">Aidan Steele</a> and <a href="https://www.linkedin.com/in/jonathan-w/">Jonathan Walker</a> contributed. 
     See the caveat on GitHub about data collected by this service.
 </div>
 
@@ -132,13 +132,19 @@
                 }
             });
 
-            const data = await response.json();
-            resultsDiv.innerHTML = '';
-            const div = document.createElement('div');
-            div.textContent = data.Principal;
-            resultsDiv.appendChild(div);
+            if (!response.ok) {
+                // If response is not OK, read the text message
+                const errorText = await response.text();
+                resultsDiv.textContent = errorText;
+            } else {
+                const data = await response.json();
+                resultsDiv.innerHTML = '';
+                const div = document.createElement('div');
+                div.textContent = data.Principal;
+                resultsDiv.appendChild(div);
+            }
         } catch (error) {
-            resultsDiv.textContent = 'No such principal found';
+            resultsDiv.textContent = 'An error occurred';
         }
     }
 </script>
