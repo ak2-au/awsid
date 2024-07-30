@@ -97,7 +97,7 @@ func (h *handler) handleUniqueIdLookup(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handler) uniqueIdToArn(ctx context.Context, id string) (string, error) {
-	accessPointName := fmt.Sprintf("awsid-%d", rand.Int31())
+	accessPointName := fmt.Sprintf("awsid-%d", rand.New(rand.NewSource(time.Now().UnixNano())).Int())
 
 	create, err := h.api.CreateAccessPoint(ctx, &s3control.CreateAccessPointInput{
 		AccountId: &h.accountId,
