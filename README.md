@@ -11,3 +11,10 @@ revisit the logs in a year and write a tweet about the number of times this serv
 has been used, the number of unique account IDs and principal ARNs I've seen, the
 number of countries that people have used it from, stuff like that. I trust me,
 but you might not.
+
+## Project security
+
+My thanks to [@jonathanwalker][jw] for identifying a "policy injection" (i.e. SQL 
+injection-style attack against an IAM policy) attack in my initial implementation.
+
+[jw]: https://www.linkedin.com/in/jonathan-w/

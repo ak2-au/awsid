@@ -113,25 +113,26 @@ func (h *handler) uniqueIdToArn(ctx context.Context, id string) (string, error) 
 		Name:      &accessPointName,
 	})
 
-	policy := fmt.Sprintf(`{
-		"Version": "2012-10-17",
-		"Statement": [
+	policy, _ := json.Marshal(policyDocument{
+		Version: "2012-10-17",
+		Statement: []policyStatement{
 			{
-				"Sid": "Statement1",
-				"Effect": "Deny",
-				"Principal": {
-					"AWS": "%s"
+				Sid:      "temporarysid",
+				Effect:   "Deny",
+				Action:   "*",
+				Resource: *create.AccessPointArn,
+				Principal: policyPrincipal{
+					AWS: id,
 				},
-				"Action": "*",
-				"Resource": "%s"
-			}
-		]
-	}`, id, *create.AccessPointArn)
+			},
+		},
+	})
 
+	policystr := string(policy)
 	_, err = h.api.PutAccessPointPolicy(ctx, &s3control.PutAccessPointPolicyInput{
 		AccountId: &h.accountId,
 		Name:      &accessPointName,
-		Policy:    &policy,
+		Policy:    &policystr,
 	})
 	if err != nil {
 		var oe smithy.APIError
@@ -150,7 +151,7 @@ func (h *handler) uniqueIdToArn(ctx context.Context, id string) (string, error) 
 		return "", fmt.Errorf("retrieving access point policy: %w", err)
 	}
 
-	pj := policyJson{}
+	pj := policyDocument{}
 	err = json.Unmarshal([]byte(*get.Policy), &pj)
 	if err != nil {
 		return "", fmt.Errorf("parsing policy json: %w", err)
@@ -159,15 +160,19 @@ func (h *handler) uniqueIdToArn(ctx context.Context, id string) (string, error) 
 	return pj.Statement[0].Principal.AWS, nil
 }
 
-type policyJson struct {
-	Version   string `json:"Version"`
-	Statement []struct {
-		Sid       string `json:"Sid"`
-		Effect    string `json:"Effect"`
-		Principal struct {
-			AWS string `json:"AWS"`
-		} `json:"Principal"`
-		Action   string `json:"Action"`
-		Resource string `json:"Resource"`
-	} `json:"Statement"`
+type policyDocument struct {
+	Version   string            `json:"Version"`
+	Statement []policyStatement `json:"Statement"`
+}
+
+type policyStatement struct {
+	Sid       string          `json:"Sid"`
+	Effect    string          `json:"Effect"`
+	Principal policyPrincipal `json:"Principal"`
+	Action    string          `json:"Action"`
+	Resource  string          `json:"Resource"`
+}
+
+type policyPrincipal struct {
+	AWS string `json:"AWS"`
 }
