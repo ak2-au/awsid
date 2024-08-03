@@ -1,0 +1,30 @@
+name: deploy-lambda
+on:
+  push:
+    branches: 
+      - main
+jobs:
+  make-deploy:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: 
+          - '1.22' 
+    permissions:
+      id-token: write  
+      contents: read  
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Configure AWS credentials
+        id: creds
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::529928417130:role/awsid-github-action-deployer
+          aws-region: ap-southeast-2
+      - name: Build & deploy
+        run: |
+          make deploy
